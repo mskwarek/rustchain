@@ -1,0 +1,6 @@
+[package]
+name = "rustchain"
+version = "0.1.0"
+authors = ["Marcin Skwarek <m.skwarek@stud.elka.pw.edu.pl>"]
+
+[dependencies]
