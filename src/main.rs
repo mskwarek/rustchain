@@ -35,11 +35,7 @@ impl Blockchain {
 }
 
 fn main() {
-    let vec: Vec<Block> = Vec::new();
-    let trans: Vec<Transaction> = Vec::new();
-    let chain =  Blockchain { chain: vec, current_transactions: trans};
-    let transaction = Transaction { amount: 5, recipient: "me".to_string(), sender: "you".to_string()};
-    chain.new_transaction(&transaction);
+
 
 }
 
@@ -49,9 +45,11 @@ mod tests {
 
     #[test]
     fn new_transaction_is_added() {
-        let chain: Blockchain;
+        let vec: Vec<Block> = Vec::new();
+        let trans: Vec<Transaction> = Vec::new();
+        let chain =  Blockchain { chain: vec, current_transactions: trans};
         let transaction = Transaction { amount: 5, recipient: "me".to_string(), sender: "you".to_string()};
         chain.new_transaction(&transaction);
-        assert!(0, 1);
+        assert!(true, true);
     }
 }
