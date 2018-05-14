@@ -27,8 +27,13 @@ pub struct Blockchain {
 }
 
 impl Blockchain {
-    pub fn new_transaction(&mut self, transaction: Transaction){
+    pub fn new_transaction(&mut self, transaction: Transaction) -> i32{
         self.current_transactions.push(transaction);
+        match self.chain.last()
+            {
+                Some(_) => 1,
+                None => 0
+            }
     }
 }
 
@@ -47,8 +52,9 @@ mod tests {
         let trans: Vec<Transaction> = Vec::new();
         let mut chain = Blockchain { chain: vec, current_transactions: trans};
         let transaction = Transaction { amount: 5, recipient: "me".to_string(), sender: "you".to_string() };
-        chain.new_transaction(transaction);
+        let index = chain.new_transaction(transaction);
         assert_eq!(1, chain.current_transactions.len());
+        assert_eq!(index, 0);
     }
 
 }
