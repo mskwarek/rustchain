@@ -1,3 +1,5 @@
+extern crate time;
+
 fn new_block(){
 }
 
@@ -6,13 +8,14 @@ fn hash(){
 }
 
 #[derive(PartialEq, PartialOrd)]
+#[derive(Clone)]
 pub struct Transaction {
     amount: u32,
     recipient: String,
     sender: String
 }
 
-
+#[derive(Clone)]
 pub struct Block {
     index: u32,
     previous_hash: String,
@@ -36,6 +39,14 @@ impl Blockchain {
             };
         num+1
     }
+
+    pub fn new_block(&mut self, proof: String, previous_hash: String) -> Block{
+        let block = Block { index: self.chain.last().unwrap().index, previous_hash: previous_hash, proof: proof, timestamp: time::now().tm_nsec as u32,
+            transactions: self.current_transactions.to_vec() };
+
+        self.chain.push(block.clone());
+        block
+    }
 }
 
 #[cfg(test)]
@@ -46,7 +57,6 @@ mod tests {
     }
 
     use super::*;
-
 
     #[test]
     fn new_transaction_is_added() {
