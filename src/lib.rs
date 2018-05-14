@@ -3,7 +3,6 @@ fn new_block(){
 
 
 fn hash(){
-
 }
 
 #[derive(PartialEq, PartialOrd)]
