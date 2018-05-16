@@ -1,14 +1,20 @@
 extern crate time;
+extern crate crypto;
+#[macro_use]
+extern crate serde_derive;
+extern crate serde_json;
+extern crate rustc_serialize;
+
+use rustc_serialize::hex::ToHex;
+use crypto::digest::Digest;
+use crypto::sha2::Sha256;
 
 fn new_block(){
 }
 
-
-fn hash(){
-}
-
 #[derive(PartialEq, PartialOrd)]
 #[derive(Clone)]
+#[derive(Serialize, Deserialize)]
 pub struct Transaction {
     amount: u32,
     recipient: String,
@@ -16,6 +22,7 @@ pub struct Transaction {
 }
 
 #[derive(Clone)]
+#[derive(Serialize, Deserialize)]
 pub struct Block {
     index: u32,
     previous_hash: String,
@@ -45,7 +52,15 @@ impl Blockchain {
             transactions: self.current_transactions.to_vec() };
 
         self.chain.push(block.clone());
+        self.current_transactions = Vec::new();
         block
+    }
+
+    pub fn calculate_hash(self, input: &Block) -> String {
+        let mut sha = Sha256::new();
+        let json = serde_json::to_string(input).expect("Couldn't serialize block");
+        sha.input_str(&json);
+        sha.result_str()//.as_bytes().to_hex()
     }
 }
 
@@ -83,6 +98,11 @@ mod tests {
         assert_eq!(index, 1);
         assert_eq!(2, chain.current_transactions.len());
         assert_eq!(index2, 2);
+    }
+
+    #[test]
+    pub fn test_to_hex() {
+        assert_eq!("foobar".as_bytes().to_hex(), "666f6f626172");
     }
 
 }
