@@ -56,11 +56,12 @@ impl Blockchain {
         block
     }
 
-    pub fn calculate_hash(self, input: &Block) -> String {
+    pub fn calculate_hash(input: &Block) -> String {
         let mut sha = Sha256::new();
         let json = serde_json::to_string(input).expect("Couldn't serialize block");
+        println!("{}", json);
         sha.input_str(&json);
-        sha.result_str()//.as_bytes().to_hex()
+        sha.result_str().as_bytes().to_hex()
     }
 }
 
@@ -103,6 +104,16 @@ mod tests {
     #[test]
     pub fn test_to_hex() {
         assert_eq!("foobar".as_bytes().to_hex(), "666f6f626172");
+    }
+
+    #[test]
+    pub fn test_calculate_hash()
+    {
+        let block = Block { index: 1, previous_hash: "".to_string(), proof: "".to_string(), timestamp: 333037375,
+            transactions: Vec::new() };
+        let hash = Blockchain::calculate_hash(&block);
+        let expected_hash = "65303765373864363636323562373366393865383866373862393838393534326564333237316433336337326537313464353435313136316364306231313739";
+        assert_eq!(hash, expected_hash);
     }
 
 }
