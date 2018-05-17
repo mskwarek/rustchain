@@ -9,9 +9,6 @@ use rustc_serialize::hex::ToHex;
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
 
-fn new_block(){
-}
-
 #[derive(PartialEq, PartialOrd)]
 #[derive(Clone)]
 #[derive(Serialize, Deserialize)]
@@ -26,7 +23,7 @@ pub struct Transaction {
 pub struct Block {
     index: u32,
     previous_hash: String,
-    proof: String,
+    proof: u32,
     timestamp: u32,
     transactions: Vec<Transaction>
 }
@@ -37,33 +34,71 @@ pub struct Blockchain {
 }
 
 impl Blockchain {
-    pub fn new_transaction(&mut self, transaction: Transaction) -> u32{
+    fn new() -> Blockchain {
+        let mut vec: Vec<Block> = Vec::new();
+        vec.push(Block { index: 1, previous_hash: "1".to_string(), proof: 100, timestamp: 333037375,
+            transactions: Vec::new() });
+        Blockchain { chain: vec, current_transactions: Vec::new() }
+    }
+    pub fn new_transaction(&mut self, transaction: Transaction) -> u32 {
         self.current_transactions.push(transaction);
         let num = match self.chain.last()
             {
                 Some(_) => self.chain.last().unwrap().index,
                 None => 0
             };
-        num+1
+        num + 1
     }
 
-    pub fn new_block(&mut self, proof: String, previous_hash: String) -> Block{
-        let block = Block { index: self.chain.last().unwrap().index, previous_hash: previous_hash, proof: proof, timestamp: time::now().tm_nsec as u32,
-            transactions: self.current_transactions.to_vec() };
+    pub fn new_block(&mut self, proof: u32, previous_hash: String) -> Block {
+        let block = Block {
+            index: self.chain.last().unwrap().index + 1,
+            previous_hash: previous_hash,
+            proof: proof,
+            timestamp: time::now().tm_nsec as u32,
+            transactions: self.current_transactions.to_vec()
+        };
 
         self.chain.push(block.clone());
         self.current_transactions = Vec::new();
         block
     }
 
-    pub fn calculate_hash(input: &Block) -> String {
+    pub fn calculate_hash(input: &String) -> String {
         let mut sha = Sha256::new();
-        let json = serde_json::to_string(input).expect("Couldn't serialize block");
-        println!("{}", json);
-        sha.input_str(&json);
+        sha.input_str(&input);
         sha.result_str().as_bytes().to_hex()
     }
+
+    pub fn calculate_hash_from_block(input: &Block) -> String {
+        let json = serde_json::to_string(input).expect("Couldn't serialize block");
+        Blockchain::calculate_hash(&json)
+    }
+
+    fn valid_proof(proof: u32, last_proof: u32) -> bool {
+        let guess = format!("{}{}", proof, last_proof);
+        let mut sha = Sha256::new();
+        sha.input_str(&guess);
+        let guess_hash = sha.result_str();
+        guess_hash[0..4].eq("0000")
+    }
+
+    pub fn proof_of_work(last_proof: u32) -> u32 {
+        let mut proof = 0;
+        while Blockchain::valid_proof(proof, last_proof) == false {
+            proof += 1;
+        }
+        proof
+    }
+
+    pub fn mine_new_block(&mut self) -> Block {
+        let last_block = self.chain.last().unwrap().clone();
+        let proof = Blockchain::proof_of_work(last_block.proof);
+        let previous_hash = Blockchain::calculate_hash_from_block(&last_block);
+        self.new_block(proof, previous_hash)
+    }
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -76,27 +111,23 @@ mod tests {
 
     #[test]
     fn new_transaction_is_added() {
-        let vec: Vec<Block> = Vec::new();
-        let trans: Vec<Transaction> = Vec::new();
-        let mut chain = Blockchain { chain: vec, current_transactions: trans};
+        let mut chain = Blockchain::new();
 
         let transaction = Transaction { amount: 5, recipient: "me".to_string(), sender: "you".to_string() };
         let index = chain.new_transaction(transaction);
         assert_eq!(1, chain.current_transactions.len());
-        assert_eq!(index, 1);
+        assert_eq!(index, 2);
     }
 
     #[test]
-    fn last_index_is_incremented() {
-        let vec: Vec<Block> = Vec::new();
-        let trans: Vec<Transaction> = Vec::new();
-        let mut chain = Blockchain { chain: vec, current_transactions: trans};
+    fn last_index_is_not_incremented() {
+        let mut chain = Blockchain::new();
 
         let transaction = Transaction { amount: 5, recipient: "me".to_string(), sender: "you".to_string() };
         let index = chain.new_transaction(transaction);
         assert_eq!(1, chain.current_transactions.len());
         let index2 = chain.new_transaction(Transaction { amount: 10, recipient: "you".to_string(), sender: "me".to_string() });
-        assert_eq!(index, 1);
+        assert_eq!(index, 2);
         assert_eq!(2, chain.current_transactions.len());
         assert_eq!(index2, 2);
     }
@@ -109,11 +140,31 @@ mod tests {
     #[test]
     pub fn test_calculate_hash()
     {
-        let block = Block { index: 1, previous_hash: "".to_string(), proof: "".to_string(), timestamp: 333037375,
+        let block = Block { index: 1, previous_hash: "1".to_string(), proof: 100, timestamp: 333037375,
             transactions: Vec::new() };
-        let hash = Blockchain::calculate_hash(&block);
-        let expected_hash = "65303765373864363636323562373366393865383866373862393838393534326564333237316433336337326537313464353435313136316364306231313739";
+        let hash = Blockchain::calculate_hash_from_block(&block);
+        let expected_hash = "36303566323332313133666639643032316337376264613461303932333666313564366136366363363062613137636335393231643564393336636139653133";
         assert_eq!(hash, expected_hash);
+    }
+
+    #[test]
+    pub fn test_proof_of_work()
+    {
+        assert_eq!(93711, Blockchain::proof_of_work(1));
+    }
+
+
+    #[test]
+    fn last_index_is_incremented_when_block_is_mined() {
+        let mut chain = Blockchain::new();
+        let transaction = Transaction { amount: 5, recipient: "me".to_string(), sender: "you".to_string() };
+        let index = chain.new_transaction(transaction);
+        assert_eq!(1, chain.current_transactions.len());
+        let block = chain.mine_new_block();
+        let index2 = chain.new_transaction(Transaction { amount: 10, recipient: "you".to_string(), sender: "me".to_string() });
+        assert_eq!(1, chain.current_transactions.len());
+        assert_eq!(index, 2);
+        assert_eq!(index2, 3);
     }
 
 }
