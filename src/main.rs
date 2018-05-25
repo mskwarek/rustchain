@@ -132,9 +132,13 @@ impl Blockchain {
     }
 }
 
-struct Microservice;
+struct Microservice
+{
+    blockchain: Blockchain
+}
 
 mod lib;
+
 
 impl Service for Microservice{
     type Request = Request;
@@ -144,7 +148,17 @@ impl Service for Microservice{
 
     fn call(&self, request: Request) -> Self::Future {
         debug!("{:?}", request);
-        Box::new(futures::future::ok(Response::new().with_status(StatusCode::NotFound)))
+        match (request.method(), request.path()){
+            (&Get, "/mine") => {
+                let block = self.blockchain.mine_new_block();
+                let body = serde_json::to_string(&block).expect("Couldn't serialize block");
+                Box::new(futures::future::ok(Response::new().with_body(body).with_status(StatusCode::Ok)))
+            }
+            _ => {
+                Box::new(futures::future::ok(Response::new().with_status(StatusCode::NotFound)))
+            }
+        }
+
     }
 }
 
@@ -152,7 +166,7 @@ fn main() {
     env_logger::init();
     let address = "127.0.0.1:8080".parse().unwrap();
     let server = hyper::server::Http::new()
-        .bind(&address, move || Ok(Microservice))
+        .bind(&address, move || Ok(Microservice {blockchain: Blockchain::new()}))
         .unwrap();
     info!("Running microservice at {}", address);
     server.run().unwrap();
