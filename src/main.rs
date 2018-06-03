@@ -23,6 +23,10 @@ extern crate crypto;
 extern crate serde_json;
 extern crate rustc_serialize;
 extern crate uuid;
+#[macro_use] extern crate lazy_static;
+
+use std::sync::Mutex;
+use std::thread;
 
 use rustc_serialize::hex::ToHex;
 use crypto::digest::Digest;
@@ -137,6 +141,10 @@ struct Microservice
 
 }
 
+lazy_static! {
+    static ref GLOBAL_BLOCKCHAIN: Mutex<Blockchain> = Mutex::new(Blockchain::new());
+}
+
 mod lib;
 
 impl Service for Microservice{
@@ -149,12 +157,15 @@ impl Service for Microservice{
     fn call(&self, request: Request) -> Self::Future {
         debug!("{:?}", request);
 
-        let mut blockchain = Blockchain::new();
+
 
         match (request.method(), request.path()){
             (hyper::Method::Get, "/mine") => {
-                let block = blockchain.mine_new_block();
+
+                let mut guard = GLOBAL_BLOCKCHAIN.lock().unwrap();
+                let block = guard.mine_new_block();
                 let body = serde_json::to_string(&block).expect("Couldn't serialize block");
+                
                 Box::new(futures::future::ok(Response::new().with_body(body).with_status(StatusCode::Ok)))
             }
             _ => {
