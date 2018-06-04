@@ -5,13 +5,12 @@ extern crate log;
 
 use std::env;
 use hyper::{Chunk, StatusCode};
+use hyper::Method::{Get, Post};
 use hyper::server::{Request, Response, Service};
-use futures::future::{Future, FutureResult};
 
 
 extern crate futures;
 extern crate hyper;
-
 
 
 #[macro_use]
@@ -23,6 +22,7 @@ extern crate crypto;
 extern crate serde_json;
 extern crate rustc_serialize;
 extern crate uuid;
+extern crate url;
 #[macro_use] extern crate lazy_static;
 
 use std::sync::Mutex;
@@ -32,6 +32,17 @@ use rustc_serialize::hex::ToHex;
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
 use uuid::Uuid;
+use std::io;
+use std::collections::HashMap;
+
+use futures::Stream;
+use futures::future::{Future, FutureResult};
+
+#[derive(Debug)]
+pub struct NewMessage {
+    pub username: String,
+    pub message: String,
+}
 
 #[derive(PartialEq, PartialOrd)]
 #[derive(Clone)]
@@ -136,6 +147,22 @@ impl Blockchain {
     }
 }
 
+fn parse_form(form_chunk: Chunk) -> FutureResult<NewMessage, hyper::Error> {
+    let mut form = url::form_urlencoded::parse(form_chunk.as_ref())
+        .into_owned()
+        .collect::<HashMap<String, String>>();
+
+    if let Some(message) = form.remove("message") {
+        let username = form.remove("username").unwrap_or(String::from("anonymous"));
+        futures::future::ok(NewMessage { username, message })
+    } else {
+        futures::future::err(hyper::Error::from(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "Missing field 'message",
+        )))
+    }
+}
+
 struct Microservice
 {
 
@@ -160,13 +187,20 @@ impl Service for Microservice{
 
 
         match (request.method(), request.path()){
-            (hyper::Method::Get, "/mine") => {
-
+            (Get, "/mine") => {
                 let mut guard = GLOBAL_BLOCKCHAIN.lock().unwrap();
                 let block = guard.mine_new_block();
                 let body = serde_json::to_string(&block).expect("Couldn't serialize block");
-                
                 Box::new(futures::future::ok(Response::new().with_body(body).with_status(StatusCode::Ok)))
+            }
+            (Post, "/transactions/new") => {
+                let future = request
+                    .body().concat2().and_then(parse_form);
+//                println!("{:?}", future);
+                Box::new(futures::future::ok(Response::new().with_status(StatusCode::Ok)))
+            }
+            (hyper::Method::Get, "/chain") => {
+                Box::new(futures::future::ok(Response::new().with_status(StatusCode::Ok)))
             }
             _ => {
                 Box::new(futures::future::ok(Response::new().with_status(StatusCode::NotFound)))
