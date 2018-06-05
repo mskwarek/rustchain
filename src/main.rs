@@ -7,6 +7,7 @@ use std::env;
 use hyper::{Chunk, StatusCode};
 use hyper::Method::{Get, Post};
 use hyper::server::{Request, Response, Service};
+use hyper::header::{ContentLength, ContentType};
 
 
 extern crate futures;
@@ -19,7 +20,9 @@ extern crate serde_derive;
 extern crate time;
 extern crate crypto;
 
+#[macro_use]
 extern crate serde_json;
+
 extern crate rustc_serialize;
 extern crate uuid;
 extern crate url;
@@ -27,6 +30,7 @@ extern crate url;
 
 use std::sync::Mutex;
 use std::thread;
+use std::error::Error;
 
 use rustc_serialize::hex::ToHex;
 use crypto::digest::Digest;
@@ -39,6 +43,7 @@ use futures::Stream;
 use futures::future::{Future, FutureResult};
 
 #[derive(Debug)]
+#[derive(Serialize, Deserialize)]
 pub struct NewMessage {
     pub username: String,
     pub message: String,
@@ -147,19 +152,49 @@ impl Blockchain {
     }
 }
 
-fn parse_form(form_chunk: Chunk) -> FutureResult<NewMessage, hyper::Error> {
+fn parse_form(form_chunk: Chunk) -> FutureResult<Transaction, hyper::Error> {
     let mut form = url::form_urlencoded::parse(form_chunk.as_ref())
         .into_owned()
         .collect::<HashMap<String, String>>();
 
-    if let Some(message) = form.remove("message") {
-        let username = form.remove("username").unwrap_or(String::from("anonymous"));
-        futures::future::ok(NewMessage { username, message })
+    if let (Some(amount), Some(recipient), Some(sender)) = (form.remove("amount"), form.remove("recipient"), form.remove("sender")) {
+        futures::future::ok(Transaction { amount: amount.parse::<u32>().unwrap(), recipient: recipient, sender: sender })
     } else {
         futures::future::err(hyper::Error::from(io::Error::new(
             io::ErrorKind::InvalidInput,
-            "Missing field 'message",
+            "Missing field 'amount' or 'recipient' or 'sender'",
         )))
+    }
+}
+
+
+fn make_error_response(error_message: &str) -> FutureResult<hyper::Response, hyper::Error> {
+    let payload = json!({
+        "error": error_message
+    }).to_string();
+    let response = Response::new()
+        .with_status(StatusCode::InternalServerError)
+        .with_header(ContentLength(payload.len() as u64))
+        .with_header(ContentType::json())
+        .with_body(payload);
+    debug!("{:?}", response);
+    futures::future::ok(response)
+}
+
+fn make_post_response(result: Result<Transaction, hyper::Error>, ) -> FutureResult<hyper::Response, hyper::Error> {
+    match result {
+        Ok(timestamp) => {
+            let payload = json!({
+                "timestamp": timestamp
+            }).to_string();
+            let response = Response::new()
+                .with_header(ContentLength(payload.len() as u64))
+                .with_header(ContentType::json())
+                .with_body(payload);
+            debug!("{:?}", response);
+            futures::future::ok(response)
+        }
+        Err(error) => make_error_response(error.description()),
     }
 }
 
@@ -195,9 +230,12 @@ impl Service for Microservice{
             }
             (Post, "/transactions/new") => {
                 let future = request
-                    .body().concat2().and_then(parse_form);
+                    .body()
+                    .concat2()
+                    .and_then(parse_form)
+                    .then(make_post_response);
 //                println!("{:?}", future);
-                Box::new(futures::future::ok(Response::new().with_status(StatusCode::Ok)))
+                Box::new(future)
             }
             (hyper::Method::Get, "/chain") => {
                 Box::new(futures::future::ok(Response::new().with_status(StatusCode::Ok)))
