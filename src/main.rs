@@ -41,6 +41,7 @@ use std::collections::HashMap;
 
 use futures::Stream;
 use futures::future::{Future, FutureResult};
+use std::collections::HashSet;
 
 #[derive(Debug)]
 #[derive(Serialize, Deserialize)]
@@ -206,16 +207,22 @@ struct Microservice
 
 lazy_static! {
     static ref GLOBAL_BLOCKCHAIN: Mutex<Blockchain> = Mutex::new(Blockchain::new());
+    static ref GLOBAL_NODES_SET: Mutex<HashSet<String>> = Mutex::new(HashSet::new());
 }
 
 mod lib;
 
-fn build_ok_response(body: String) -> Response {
-    Response::new()
-        .with_header(ContentLength(body.len() as u64))
-        .with_header(ContentType::json())
-        .with_body(body)
-        .with_status(StatusCode::Ok)
+fn build_ok_response(body: String) -> FutureResult<Response, hyper::Error> {
+    futures::future::ok(
+        Response::new()
+            .with_header(ContentLength(body.len() as u64))
+            .with_header(ContentType::json())
+            .with_body(body)
+            .with_status(StatusCode::Ok))
+}
+
+fn register_node(address: String) {
+    GLOBAL_NODES_SET.lock().unwrap().insert(address);
 }
 
 impl Service for Microservice{
@@ -225,18 +232,16 @@ impl Service for Microservice{
     type Future = Box<Future<Item = Self::Response, Error = Self::Error>>;
 
 
-
-
     fn call(&self, request: Request) -> Self::Future {
         debug!("{:?}", request);
-
+        
         match (request.method(), request.path()){
             (Get, "/mine") => {
                 let mut guard = GLOBAL_BLOCKCHAIN.lock().unwrap();
                 let block = guard.mine_new_block();
                 let body = serde_json::to_string(&block).expect("Couldn't serialize block");
                 debug!("{:?}", body);
-                Box::new(futures::future::ok(build_ok_response(body)))
+                Box::new(build_ok_response(body))
             }
             (Post, "/transactions/new") => {
                 let future = request
@@ -248,8 +253,12 @@ impl Service for Microservice{
             }
             (Get, "/chain") => {
                 let chain = serde_json::to_string(&GLOBAL_BLOCKCHAIN.lock().unwrap().chain).expect("Couldn't serialize blockchain");
-                Box::new(futures::future::ok(build_ok_response(chain)))
+                Box::new(build_ok_response(chain))
             }
+            (Post, "/nodes/register") => {
+                Box::new(build_ok_response("".to_string()))
+            }
+
             _ => {
                 Box::new(futures::future::ok(Response::new().with_status(StatusCode::NotFound)))
             }
