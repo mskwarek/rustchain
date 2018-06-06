@@ -183,10 +183,11 @@ fn make_error_response(error_message: &str) -> FutureResult<hyper::Response, hyp
 
 fn make_post_response(result: Result<Transaction, hyper::Error>, ) -> FutureResult<hyper::Response, hyper::Error> {
     match result {
-        Ok(timestamp) => {
-            let payload = json!({
-                "timestamp": timestamp
-            }).to_string();
+        Ok(transaction) => {
+            let mut guard = GLOBAL_BLOCKCHAIN.lock().unwrap();
+            let block = guard.new_transaction(transaction);
+
+            let payload = json!({"message" : format!("Transaction will be added to block {}", block)}).to_string();
             let response = Response::new()
                 .with_header(ContentLength(payload.len() as u64))
                 .with_header(ContentType::json())
@@ -226,6 +227,7 @@ impl Service for Microservice{
                 let mut guard = GLOBAL_BLOCKCHAIN.lock().unwrap();
                 let block = guard.mine_new_block();
                 let body = serde_json::to_string(&block).expect("Couldn't serialize block");
+                debug!("{:?}", body);
                 Box::new(futures::future::ok(Response::new().with_body(body).with_status(StatusCode::Ok)))
             }
             (Post, "/transactions/new") => {
@@ -234,11 +236,14 @@ impl Service for Microservice{
                     .concat2()
                     .and_then(parse_form)
                     .then(make_post_response);
-//                println!("{:?}", future);
                 Box::new(future)
             }
             (hyper::Method::Get, "/chain") => {
-                Box::new(futures::future::ok(Response::new().with_status(StatusCode::Ok)))
+                let chain = serde_json::to_string(&GLOBAL_BLOCKCHAIN.lock().unwrap().chain).expect("Couldn't serialize blockchain");
+                Box::new(futures::future::ok(
+                    Response::new()
+                        .with_body(chain)
+                        .with_status(StatusCode::Ok)))
             }
             _ => {
                 Box::new(futures::future::ok(Response::new().with_status(StatusCode::NotFound)))
