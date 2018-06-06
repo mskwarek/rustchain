@@ -210,6 +210,14 @@ lazy_static! {
 
 mod lib;
 
+fn build_ok_response(body: String) -> Response {
+    Response::new()
+        .with_header(ContentLength(body.len() as u64))
+        .with_header(ContentType::json())
+        .with_body(body)
+        .with_status(StatusCode::Ok)
+}
+
 impl Service for Microservice{
     type Request = Request;
     type Response = Response;
@@ -217,10 +225,10 @@ impl Service for Microservice{
     type Future = Box<Future<Item = Self::Response, Error = Self::Error>>;
 
 
+
+
     fn call(&self, request: Request) -> Self::Future {
         debug!("{:?}", request);
-
-
 
         match (request.method(), request.path()){
             (Get, "/mine") => {
@@ -228,7 +236,7 @@ impl Service for Microservice{
                 let block = guard.mine_new_block();
                 let body = serde_json::to_string(&block).expect("Couldn't serialize block");
                 debug!("{:?}", body);
-                Box::new(futures::future::ok(Response::new().with_body(body).with_status(StatusCode::Ok)))
+                Box::new(futures::future::ok(build_ok_response(body)))
             }
             (Post, "/transactions/new") => {
                 let future = request
@@ -238,12 +246,9 @@ impl Service for Microservice{
                     .then(make_post_response);
                 Box::new(future)
             }
-            (hyper::Method::Get, "/chain") => {
+            (Get, "/chain") => {
                 let chain = serde_json::to_string(&GLOBAL_BLOCKCHAIN.lock().unwrap().chain).expect("Couldn't serialize blockchain");
-                Box::new(futures::future::ok(
-                    Response::new()
-                        .with_body(chain)
-                        .with_status(StatusCode::Ok)))
+                Box::new(futures::future::ok(build_ok_response(chain)))
             }
             _ => {
                 Box::new(futures::future::ok(Response::new().with_status(StatusCode::NotFound)))
