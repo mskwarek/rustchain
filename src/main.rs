@@ -200,6 +200,39 @@ fn make_post_response(result: Result<Transaction, hyper::Error>, ) -> FutureResu
     }
 }
 
+fn parse_register(form_chunk: Chunk) -> FutureResult<Transaction, hyper::Error> {
+    let mut form = url::form_urlencoded::parse(form_chunk.as_ref())
+        .into_owned()
+        .collect::<HashMap<String, String>>();
+
+    if let (Some(amount), Some(recipient), Some(sender)) = (form.remove("amount"), form.remove("recipient"), form.remove("sender")) {
+        futures::future::ok(Transaction { amount: amount.parse::<u32>().unwrap(), recipient: recipient, sender: sender })
+    } else {
+        futures::future::err(hyper::Error::from(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "Missing field 'amount' or 'recipient' or 'sender'",
+        )))
+    }
+}
+
+fn make_register_response(result: Result<Transaction, hyper::Error>, ) -> FutureResult<hyper::Response, hyper::Error> {
+    match result {
+        Ok(transaction) => {
+            let mut guard = GLOBAL_BLOCKCHAIN.lock().unwrap();
+            let block = guard.new_transaction(transaction);
+
+            let payload = json!({"message" : format!("Transaction will be added to block {}", block)}).to_string();
+            let response = Response::new()
+                .with_header(ContentLength(payload.len() as u64))
+                .with_header(ContentType::json())
+                .with_body(payload);
+            debug!("{:?}", response);
+            futures::future::ok(response)
+        }
+        Err(error) => make_error_response(error.description()),
+    }
+}
+
 struct Microservice
 {
 
@@ -256,9 +289,13 @@ impl Service for Microservice{
                 Box::new(build_ok_response(chain))
             }
             (Post, "/nodes/register") => {
+                let future = request
+                    .body()
+                    .concat2()
+                    .and_then(parse_register)
+                    .then(make_register_response);
                 Box::new(build_ok_response("".to_string()))
             }
-
             _ => {
                 Box::new(futures::future::ok(Response::new().with_status(StatusCode::NotFound)))
             }
