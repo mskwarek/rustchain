@@ -42,6 +42,7 @@ use std::collections::HashMap;
 use futures::Stream;
 use futures::future::{Future, FutureResult};
 use std::collections::HashSet;
+use std::str;
 
 #[derive(Debug)]
 #[derive(Serialize, Deserialize)]
@@ -200,36 +201,24 @@ fn make_post_response(result: Result<Transaction, hyper::Error>, ) -> FutureResu
     }
 }
 
-fn parse_register(form_chunk: Chunk) -> FutureResult<Transaction, hyper::Error> {
+fn parse_register(form_chunk: Chunk) -> FutureResult<Vec<String>, hyper::Error> {
     let mut form = url::form_urlencoded::parse(form_chunk.as_ref())
         .into_owned()
         .collect::<HashMap<String, String>>();
 
-    if let (Some(amount), Some(recipient), Some(sender)) = (form.remove("amount"), form.remove("recipient"), form.remove("sender")) {
-        futures::future::ok(Transaction { amount: amount.parse::<u32>().unwrap(), recipient: recipient, sender: sender })
+    if let Some(nodes) = form.remove("nodes") {
+        let res: Vec<String> = nodes
+            .replace("[", "")
+            .replace("]", "")
+            .replace(" ", "")
+            .split(",")
+            .map(|s| s.to_string()).collect();
+        futures::future::ok(res)
     } else {
         futures::future::err(hyper::Error::from(io::Error::new(
             io::ErrorKind::InvalidInput,
-            "Missing field 'amount' or 'recipient' or 'sender'",
+            "Missing field 'nodes' or 'recipient' or 'sender'",
         )))
-    }
-}
-
-fn make_register_response(result: Result<Transaction, hyper::Error>, ) -> FutureResult<hyper::Response, hyper::Error> {
-    match result {
-        Ok(transaction) => {
-            let mut guard = GLOBAL_BLOCKCHAIN.lock().unwrap();
-            let block = guard.new_transaction(transaction);
-
-            let payload = json!({"message" : format!("Transaction will be added to block {}", block)}).to_string();
-            let response = Response::new()
-                .with_header(ContentLength(payload.len() as u64))
-                .with_header(ContentType::json())
-                .with_body(payload);
-            debug!("{:?}", response);
-            futures::future::ok(response)
-        }
-        Err(error) => make_error_response(error.description()),
     }
 }
 
@@ -240,7 +229,7 @@ struct Microservice
 
 lazy_static! {
     static ref GLOBAL_BLOCKCHAIN: Mutex<Blockchain> = Mutex::new(Blockchain::new());
-    static ref GLOBAL_NODES_SET: Mutex<HashSet<String>> = Mutex::new(HashSet::new());
+    static ref GLOBAL_NODES_SET: Mutex<Vec<String>> = Mutex::new(Vec::new());
 }
 
 mod lib;
@@ -255,7 +244,37 @@ fn build_ok_response(body: String) -> FutureResult<Response, hyper::Error> {
 }
 
 fn register_node(address: String) {
-    GLOBAL_NODES_SET.lock().unwrap().insert(address);
+    println!("{}", address);
+    let result = GLOBAL_NODES_SET.lock().unwrap().iter().position(|r| r.to_string() == address);
+    match  result {
+        Some(_) => {}
+        _ => {
+            GLOBAL_NODES_SET.lock().unwrap().push(address);
+        }
+    }
+
+}
+
+fn make_register_response(result: Result<Vec<String>, hyper::Error>, ) -> FutureResult<hyper::Response, hyper::Error> {
+    match result {
+        Ok(rsp) => {
+            println!("{:?}", rsp);
+            for item in rsp {
+                register_node(item);
+            }
+            let all = GLOBAL_NODES_SET.lock().unwrap();
+
+            let nodes_str = format!("{:?}", all);
+            let payload = json!({"message" : format!("Nodes will be registered"), "nodes" : nodes_str}).to_string();
+            let response = Response::new()
+                .with_header(ContentLength(payload.len() as u64))
+                .with_header(ContentType::json())
+                .with_body(payload);
+            debug!("{:?}", response);
+            futures::future::ok(response)
+        }
+        Err(error) => make_error_response(error.description()),
+    }
 }
 
 impl Service for Microservice{
@@ -294,7 +313,7 @@ impl Service for Microservice{
                     .concat2()
                     .and_then(parse_register)
                     .then(make_register_response);
-                Box::new(build_ok_response("".to_string()))
+                Box::new(future)
             }
             _ => {
                 Box::new(futures::future::ok(Response::new().with_status(StatusCode::NotFound)))
