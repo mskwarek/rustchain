@@ -277,6 +277,20 @@ fn make_register_response(result: Result<Vec<String>, hyper::Error>, ) -> Future
     }
 }
 
+fn chain_consensus() -> Vec<Block> {
+    let neighbours = GLOBAL_NODES_SET.lock().unwrap();
+    
+    for neighbour in neighbours.iter() {
+        println!("{}", neighbour);
+    }
+
+    Vec::new()
+}
+
+fn make_resolve_response(chain: Vec<Block>) -> String {
+    json!({"error" : "Not implemented"}).to_string()
+}
+
 impl Service for Microservice{
     type Request = Request;
     type Response = Response;
@@ -314,6 +328,11 @@ impl Service for Microservice{
                     .and_then(parse_register)
                     .then(make_register_response);
                 Box::new(future)
+            }
+            (Get, "/nodes/resolve") => {
+                let validated_chain = chain_consensus();
+                let resp_body = make_resolve_response(validated_chain);
+                Box::new(build_ok_response(resp_body))
             }
             _ => {
                 Box::new(futures::future::ok(Response::new().with_status(StatusCode::NotFound)))
