@@ -262,7 +262,7 @@ fn make_register_response(result: Result<Vec<String>, hyper::Error>, ) -> Future
             for item in rsp {
                 register_node(item);
             }
-            let all = GLOBAL_NODES_SET.lock().unwrap();
+            let all = GLOBAL_NODES_SET.lock().unwrap().to_vec();
 
             let nodes_str = format!("{:?}", all);
             let payload = json!({"message" : format!("Nodes will be registered"), "nodes" : nodes_str}).to_string();
@@ -279,7 +279,7 @@ fn make_register_response(result: Result<Vec<String>, hyper::Error>, ) -> Future
 
 fn chain_consensus() -> Vec<Block> {
     let neighbours = GLOBAL_NODES_SET.lock().unwrap();
-    
+
     for neighbour in neighbours.iter() {
         println!("{}", neighbour);
     }
