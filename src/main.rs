@@ -277,11 +277,17 @@ fn make_register_response(result: Result<Vec<String>, hyper::Error>, ) -> Future
     }
 }
 
+fn request_chain_from(neighbour: String) -> Vec<Block> {
+    println!("{}", neighbour);
+
+    Vec::new()
+}
+
 fn chain_consensus() -> Vec<Block> {
     let neighbours = GLOBAL_NODES_SET.lock().unwrap();
 
     for neighbour in neighbours.iter() {
-        println!("{}", neighbour);
+        let new_chain = request_chain_from(neighbour.to_string());
     }
 
     Vec::new()
