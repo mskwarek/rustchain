@@ -277,13 +277,9 @@ fn make_register_response(result: Result<Vec<String>, hyper::Error>, ) -> Future
     }
 }
 
-fn handle() {
-
-}
-
 fn request_chain_from(neighbour: String) -> Vec<Block> {
     println!("{}", neighbour);
-    let url = neighbour.parse().unwrap();
+//    let url = neighbour.parse().unwrap();
 
 
 
