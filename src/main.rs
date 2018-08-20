@@ -8,7 +8,7 @@ use hyper::{Chunk, StatusCode};
 use hyper::Method::{Get, Post};
 use hyper::server::{Request, Response, Service};
 use hyper::header::{ContentLength, ContentType};
-
+use hyper::Client;
 
 extern crate futures;
 extern crate hyper;
@@ -277,8 +277,15 @@ fn make_register_response(result: Result<Vec<String>, hyper::Error>, ) -> Future
     }
 }
 
+fn handle() {
+
+}
+
 fn request_chain_from(neighbour: String) -> Vec<Block> {
     println!("{}", neighbour);
+    let url = neighbour.parse().unwrap();
+
+
 
     Vec::new()
 }
