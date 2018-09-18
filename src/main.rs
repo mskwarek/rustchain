@@ -1,47 +1,44 @@
 extern crate env_logger;
+extern crate futures;
+extern crate hyper;
+extern crate pretty_env_logger;
 
 #[macro_use]
 extern crate log;
-
-use std::env;
-use hyper::{Chunk, StatusCode};
-use hyper::Method::{Get, Post};
-use hyper::server::{Request, Response, Service};
-use hyper::header::{ContentLength, ContentType};
-use hyper::Client;
-
-extern crate futures;
-extern crate hyper;
-
-
-#[macro_use]
-extern crate serde_derive;
-
-extern crate time;
-extern crate crypto;
-
 #[macro_use]
 extern crate serde_json;
+#[macro_use]
+extern crate serde_derive;
+extern crate serde;
 
 extern crate rustc_serialize;
 extern crate uuid;
 extern crate url;
-#[macro_use] extern crate lazy_static;
+
+use hyper::{Response, Request, Method, Server, Client, StatusCode, Body, header, Chunk};
+use hyper::service::service_fn;
+use hyper::client::HttpConnector;
+use futures::{future, Future};
+use serde::ser;
+use futures::Stream;
+
+
+
+extern crate time;
+extern crate crypto;
+
+
+
+#[macro_use] 
+extern crate lazy_static;
 
 use std::sync::Mutex;
-use std::thread;
-use std::error::Error;
+
 
 use rustc_serialize::hex::ToHex;
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
 use uuid::Uuid;
-use std::io;
-use std::collections::HashMap;
-
-use futures::Stream;
-use futures::future::{Future, FutureResult};
-use std::collections::HashSet;
 use std::str;
 
 #[derive(Debug)]
@@ -154,72 +151,125 @@ impl Blockchain {
     }
 }
 
-fn parse_form(form_chunk: Chunk) -> FutureResult<Transaction, hyper::Error> {
-    let mut form = url::form_urlencoded::parse(form_chunk.as_ref())
-        .into_owned()
-        .collect::<HashMap<String, String>>();
+fn get_transaction(data: &str) -> Result<Transaction, serde_json::Error> {
+    let p: Transaction = serde_json::from_str(data)?;
+    println!("Transaction to add: {}, {}, {}", p.amount, p.recipient, p.sender);
+    Ok(p)
+}
 
-    if let (Some(amount), Some(recipient), Some(sender)) = (form.remove("amount"), form.remove("recipient"), form.remove("sender")) {
-        futures::future::ok(Transaction { amount: amount.parse::<u32>().unwrap(), recipient: recipient, sender: sender })
-    } else {
-        futures::future::err(hyper::Error::from(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            "Missing field 'amount' or 'recipient' or 'sender'",
-        )))
+fn parse_form(form_chunk: Result<Chunk, hyper::Error>) -> futures::future::FutureResult<hyper::Response<Body>, hyper::Error>  {
+    match form_chunk {
+        Ok(body) => {
+            let mut acc = Vec::new();
+            acc.extend_from_slice(&*body);
+            let stringify = String::from_utf8(acc).unwrap();
+
+            match get_transaction(&stringify.to_string()) {
+                Ok(transaction) => {
+                    let mut guard = GLOBAL_BLOCKCHAIN.lock().unwrap();
+                    let block = guard.new_transaction(transaction);
+                    let payload = json!({"message" : format!("Transaction will be added to block {}", block)}).to_string();
+                    let response = Response::builder()
+                        .header(header::CONTENT_TYPE, "application/json")
+                        .body(Body::from(payload))
+                        .unwrap();
+                    debug!("{:?}", response);
+                    futures::future::ok(response)
+                }
+                Err(_) => {
+                    future::ok(make_error_response("Received JSON error"))
+//                    futures::future::err(hyper::Error::from(std::io::Error::new(
+//                        std::io::ErrorKind::InvalidInput,
+//                        "Missing field 'amount' or 'recipient' or 'sender'",
+//                    )))
+                }
+            }
+        }
+        Err(error) => {
+            future::ok(make_error_response("unknown error"))
+        }
     }
 }
 
 
-fn make_error_response(error_message: &str) -> FutureResult<hyper::Response, hyper::Error> {
+fn make_error_response(error_message: &str) -> Response<Body> {
     let payload = json!({
         "error": error_message
     }).to_string();
-    let response = Response::new()
-        .with_status(StatusCode::InternalServerError)
-        .with_header(ContentLength(payload.len() as u64))
-        .with_header(ContentType::json())
-        .with_body(payload);
-    debug!("{:?}", response);
-    futures::future::ok(response)
+    Response::builder()
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(payload))
+        .unwrap()
 }
 
-fn make_post_response(result: Result<Transaction, hyper::Error>, ) -> FutureResult<hyper::Response, hyper::Error> {
-    match result {
-        Ok(transaction) => {
-            let mut guard = GLOBAL_BLOCKCHAIN.lock().unwrap();
-            let block = guard.new_transaction(transaction);
-
-            let payload = json!({"message" : format!("Transaction will be added to block {}", block)}).to_string();
-            let response = Response::new()
-                .with_header(ContentLength(payload.len() as u64))
-                .with_header(ContentType::json())
-                .with_body(payload);
-            debug!("{:?}", response);
-            futures::future::ok(response)
+fn return_json<T>(data: &T) -> hyper::Response<Body>
+    where T: ser::Serialize
+{
+    match serde_json::to_string(data) {
+        Ok(json) => {
+            Response::builder()
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(json))
+                .unwrap()
         }
-        Err(error) => make_error_response(error.description()),
+        Err(e) => {
+            eprintln!("serializing json: {}", e);
+
+            Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body(Body::from("Internal Server Error"))
+                .unwrap()
+        }
     }
 }
 
-fn parse_register(form_chunk: Chunk) -> FutureResult<Vec<String>, hyper::Error> {
-    let mut form = url::form_urlencoded::parse(form_chunk.as_ref())
-        .into_owned()
-        .collect::<HashMap<String, String>>();
+#[derive(Serialize, Deserialize)]
+struct NodeList {
+    nodes: Vec<String>,
+}
 
-    if let Some(nodes) = form.remove("nodes") {
-        let res: Vec<String> = nodes
-            .replace("[", "")
-            .replace("]", "")
-            .replace(" ", "")
-            .split(",")
-            .map(|s| s.to_string()).collect();
-        futures::future::ok(res)
-    } else {
-        futures::future::err(hyper::Error::from(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            "Missing field 'nodes' or 'recipient' or 'sender'",
-        )))
+fn typed_example(data: &str) -> Result<NodeList, serde_json::Error> {
+    let p: NodeList = serde_json::from_str(data)?;
+    println!("Please register: {:?}", p.nodes);
+    Ok(p)
+}
+
+
+fn parse_register(form_chunk: Result<Chunk, hyper::Error>) -> futures::future::FutureResult<hyper::Response<Body>, hyper::Error> {
+    match form_chunk {
+        Ok(body) => {
+            let mut acc = Vec::new();
+            acc.extend_from_slice(&*body);
+            let stringify = String::from_utf8(acc).unwrap();
+            println!("{}", stringify);
+
+            match typed_example(&stringify.to_string()) {
+                Ok(json) => {
+                    for item in json.nodes {
+                        register_node(item);
+                    }
+
+                    let all = GLOBAL_NODES_SET.lock().unwrap().to_vec();
+                    let nodes_str = format!("{:?}", all);
+                    let payload = json!({"message" : format!("Nodes will be registered"), "nodes" : nodes_str}).to_string();
+                    debug!("{:?}", payload);
+                    future::ok(Response::builder()
+                        .header(header::CONTENT_TYPE, "application/json")
+                        .body(Body::from(payload))
+                        .unwrap())
+                }
+                Err(_) => {
+                    future::ok(make_error_response("Wrong nodes list"))
+                }
+            }
+            
+        }
+        Err(_) => {
+            future::ok(make_error_response("No nodes in request"))
+        }
     }
+    
+    
 }
 
 struct Microservice
@@ -234,46 +284,14 @@ lazy_static! {
 
 mod lib;
 
-fn build_ok_response(body: String) -> FutureResult<Response, hyper::Error> {
-    futures::future::ok(
-        Response::new()
-            .with_header(ContentLength(body.len() as u64))
-            .with_header(ContentType::json())
-            .with_body(body)
-            .with_status(StatusCode::Ok))
-}
-
 fn register_node(address: String) {
-    println!("{}", address);
+//    println!("{}", address);
     let result = GLOBAL_NODES_SET.lock().unwrap().iter().position(|r| r.to_string() == address);
     match  result {
         Some(_) => {}
         _ => {
             GLOBAL_NODES_SET.lock().unwrap().push(address);
         }
-    }
-
-}
-
-fn make_register_response(result: Result<Vec<String>, hyper::Error>, ) -> FutureResult<hyper::Response, hyper::Error> {
-    match result {
-        Ok(rsp) => {
-            println!("{:?}", rsp);
-            for item in rsp {
-                register_node(item);
-            }
-            let all = GLOBAL_NODES_SET.lock().unwrap().to_vec();
-
-            let nodes_str = format!("{:?}", all);
-            let payload = json!({"message" : format!("Nodes will be registered"), "nodes" : nodes_str}).to_string();
-            let response = Response::new()
-                .with_header(ContentLength(payload.len() as u64))
-                .with_header(ContentType::json())
-                .with_body(payload);
-            debug!("{:?}", response);
-            futures::future::ok(response)
-        }
-        Err(error) => make_error_response(error.description()),
     }
 }
 
@@ -300,65 +318,78 @@ fn make_resolve_response(chain: Vec<Block>) -> String {
     json!({"error" : "Not implemented"}).to_string()
 }
 
-impl Service for Microservice{
-    type Request = Request;
-    type Response = Response;
-    type Error = hyper::Error;
-    type Future = Box<Future<Item = Self::Response, Error = Self::Error>>;
+fn response(req: Request<Body>, client: &Client<HttpConnector>)
+    -> Box<Future<Item=Response<Body>, Error=hyper::Error> + Send>{
+    debug!("{:?}", req);
+    static NOTFOUND: &[u8] = b"Not Found";
 
+    match (req.method(), req.uri().path()){
+        (&Method::GET, "/mine") => {
+            let mut guard = GLOBAL_BLOCKCHAIN.lock().unwrap();
+            let block = guard.mine_new_block();
+            let res = return_json(&block);
 
-    fn call(&self, request: Request) -> Self::Future {
-        debug!("{:?}", request);
-        
-        match (request.method(), request.path()){
-            (Get, "/mine") => {
-                let mut guard = GLOBAL_BLOCKCHAIN.lock().unwrap();
-                let block = guard.mine_new_block();
-                let body = serde_json::to_string(&block).expect("Couldn't serialize block");
-                debug!("{:?}", body);
-                Box::new(build_ok_response(body))
-            }
-            (Post, "/transactions/new") => {
-                let future = request
-                    .body()
-                    .concat2()
-                    .and_then(parse_form)
-                    .then(make_post_response);
-                Box::new(future)
-            }
-            (Get, "/chain") => {
-                let chain = serde_json::to_string(&GLOBAL_BLOCKCHAIN.lock().unwrap().chain).expect("Couldn't serialize blockchain");
-                Box::new(build_ok_response(chain))
-            }
-            (Post, "/nodes/register") => {
-                let future = request
-                    .body()
-                    .concat2()
-                    .and_then(parse_register)
-                    .then(make_register_response);
-                Box::new(future)
-            }
-            (Get, "/nodes/resolve") => {
-                let validated_chain = chain_consensus();
-                let resp_body = make_resolve_response(validated_chain);
-                Box::new(build_ok_response(resp_body))
-            }
-            _ => {
-                Box::new(futures::future::ok(Response::new().with_status(StatusCode::NotFound)))
-            }
+            Box::new(future::ok(res))
         }
-
+        (&Method::POST, "/transactions/new") => {
+            let future = req
+                .into_body()
+                .concat2()
+                .then(parse_form);
+            Box::new(future)
+        }
+        (&Method::GET, "/chain") => {
+            let chain = &GLOBAL_BLOCKCHAIN.lock().unwrap().chain;
+            Box::new(future::ok(return_json(&chain)))
+        }
+        (&Method::POST, "/nodes/register") => {
+            let body = req.into_body()
+                .concat2()
+                .then(parse_register);
+            Box::new(body)
+        }
+        (&Method::GET, "/nodes/resolve") => {
+            let validated_chain = chain_consensus();
+            let resp_body = make_resolve_response(validated_chain);
+            Box::new(future::ok(return_json(&resp_body)))
+        }
+        _ => {
+            let body = Body::from(NOTFOUND);
+            Box::new(future::ok(Response::builder()
+                                         .status(StatusCode::NOT_FOUND)
+                                         .body(body)
+                                         .unwrap()))
+        }
     }
+
 }
 
+
 fn main() {
-    env_logger::init();
-    let address = "127.0.0.1:8080".parse().unwrap();
-    let server = hyper::server::Http::new()
-        .bind(&address, move || Ok(Microservice {}))
-        .unwrap();
-    info!("Running microservice at {}", address);
-    server.run().unwrap();
+    pretty_env_logger::init();
+
+    let addr = "127.0.0.1:1337".parse().unwrap();
+
+    hyper::rt::run(future::lazy(move || {
+        // Share a `Client` with all `Service`s
+        let client = Client::new();
+
+        let new_service = move || {
+            // Move a clone of `client` into the `service_fn`.
+            let client = client.clone();
+            service_fn(move |req| {
+                response(req, &client)
+            })
+        };
+
+        let server = Server::bind(&addr)
+            .serve(new_service)
+            .map_err(|e| eprintln!("server error: {}", e));
+
+        println!("Listening on http://{}", addr);
+
+        server
+    }));
 }
 
 
@@ -423,7 +454,6 @@ mod tests {
         assert_eq!(93711, Blockchain::proof_of_work(1));
     }
 
-
     #[test]
     fn last_index_is_incremented_when_block_is_mined() {
         let mut chain = Blockchain::new();
@@ -436,4 +466,17 @@ mod tests {
         assert_eq!(index, 2);
         assert_eq!(index2, 3);
     }
+
+    // #[test]
+    // fn () {
+    //     let mut chain = Blockchain::new();
+    //     let transaction = Transaction { amount: 5, recipient: "me".to_string(), sender: "you".to_string() };
+    //     let index = chain.new_transaction(transaction);
+    //     assert_eq!(1, chain.current_transactions.len());
+    //     chain.mine_new_block();
+    //     let index2 = chain.new_transaction(Transaction { amount: 10, recipient: "you".to_string(), sender: "me".to_string() });
+    //     assert_eq!(1, chain.current_transactions.len());
+
+
+    // }
 }
