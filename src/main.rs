@@ -332,13 +332,16 @@ fn fetch_url(url: hyper::Uri) -> impl Future<Item=(), Error=()> {
 
 fn chain_consensus() -> Vec<Block> {
     let neighbours = GLOBAL_NODES_SET.lock().unwrap();
+    let mut tmp_longest_chain: Vec<Block> = GLOBAL_BLOCKCHAIN.lock().unwrap().chain.clone();
 
     for neighbour in neighbours.iter() {
         let new_chain = request_chain_from(neighbour.to_string());
+        if new_chain.len() > GLOBAL_NODES_SET.lock().unwrap().len() {
+            tmp_longest_chain = new_chain;
+        }
     }
 
-
-    Vec::new()
+    tmp_longest_chain
 }
 
 fn make_resolve_response() -> futures::future::FutureResult<hyper::Response<Body>, hyper::Error> {
