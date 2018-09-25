@@ -21,7 +21,7 @@ use hyper::client::HttpConnector;
 use futures::{future, Future};
 use serde::ser;
 use futures::Stream;
-
+use std::io::Write;
 
 
 extern crate time;
@@ -268,8 +268,6 @@ fn parse_register(form_chunk: Result<Chunk, hyper::Error>) -> futures::future::F
             future::ok(make_error_response("No nodes in request"))
         }
     }
-    
-    
 }
 
 struct Microservice
@@ -297,11 +295,39 @@ fn register_node(address: String) {
 
 fn request_chain_from(neighbour: String) -> Vec<Block> {
     println!("{}", neighbour);
-//    let url = neighbour.parse().unwrap();
-
-
+    let url = neighbour.parse::<hyper::Uri>().unwrap();
+    hyper::rt::run(fetch_url(url));
 
     Vec::new()
+}
+
+fn fetch_url(url: hyper::Uri) -> impl Future<Item=(), Error=()> {
+    let client = Client::new();
+
+    client
+        // Fetch the url...
+        .get(url)
+        // And then, if we get a response back...
+        .and_then(|res| {
+            println!("Response: {}", res.status());
+            println!("Headers: {:#?}", res.headers());
+
+            // The body is a stream, and for_each returns a new Future
+            // when the stream is finished, and calls the closure on
+            // each chunk of the body...
+            res.into_body().for_each(|chunk| {
+                std::io::stdout().write_all(&chunk)
+                    .map_err(|e| panic!("example expects stdout is open, error={}", e))
+            })
+        })
+        // If all good, just tell the user...
+        .map(|_| {
+            println!("\n\nDone.");
+        })
+        // If there was an error, let the user know...
+        .map_err(|err| {
+            eprintln!("Error {}", err);
+        })
 }
 
 fn chain_consensus() -> Vec<Block> {
@@ -311,11 +337,20 @@ fn chain_consensus() -> Vec<Block> {
         let new_chain = request_chain_from(neighbour.to_string());
     }
 
+
     Vec::new()
 }
 
-fn make_resolve_response(chain: Vec<Block>) -> String {
-    json!({"error" : "Not implemented"}).to_string()
+fn make_resolve_response() -> futures::future::FutureResult<hyper::Response<Body>, hyper::Error> {
+    let validated_chain = chain_consensus();
+    let json_resp = json!({"blockchain" : json!(&validated_chain).to_string()}).to_string();
+
+    let response = Response::builder()
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(json_resp))
+        .unwrap();
+
+    future::ok(response)
 }
 
 fn response(req: Request<Body>, client: &Client<HttpConnector>)
@@ -349,9 +384,7 @@ fn response(req: Request<Body>, client: &Client<HttpConnector>)
             Box::new(body)
         }
         (&Method::GET, "/nodes/resolve") => {
-            let validated_chain = chain_consensus();
-            let resp_body = make_resolve_response(validated_chain);
-            Box::new(future::ok(return_json(&resp_body)))
+            Box::new(make_resolve_response())
         }
         _ => {
             let body = Body::from(NOTFOUND);
