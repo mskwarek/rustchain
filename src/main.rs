@@ -262,7 +262,7 @@ fn parse_register(form_chunk: Result<Chunk, hyper::Error>) -> futures::future::F
                     future::ok(make_error_response("Wrong nodes list"))
                 }
             }
-            
+         
         }
         Err(_) => {
             future::ok(make_error_response("No nodes in request"))
@@ -347,7 +347,7 @@ fn response(req: Request<Body>, client: &Client<HttpConnector>)
                 .concat2()
                 .then(parse_register);
             Box::new(body)
-        }
+       }
         (&Method::GET, "/nodes/resolve") => {
             let validated_chain = chain_consensus();
             let resp_body = make_resolve_response(validated_chain);
