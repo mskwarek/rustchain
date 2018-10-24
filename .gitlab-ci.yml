@@ -3,18 +3,6 @@
 # https://hub.docker.com/r/library/rust/tags/
 image: "rust:latest"
 
-before_install: 
-  apt-get update
-addons:
-  apt:
-    packages:
-      - libcurl4-openssl-dev
-      - libelf-dev
-      - libdw-dev
-      - cmake
-      - gcc
-      - binutils-dev
-
 # Optional: Pick zero or more services to be used on all builds.
 # Only needed when using a docker container to run your tests in.
 # Check out: http://docs.gitlab.com/ce/ci/docker/using_docker_images.html#what-is-a-service
@@ -28,6 +16,7 @@ addons:
 before_script:
 - apt-get update -yqq
 - apt-get install -yqq --no-install-recommends build-essential
+        libcurl4-openssl-dev libelf-dev libdw-dev cmake gcc binutils-dev
 
 # Use cargo to test the project
 test:cargo:
@@ -35,4 +24,18 @@ test:cargo:
   - rustc --version && cargo --version      # Print version info for debugging
   - cargo test --all --verbose
 
-
+test:coverage:
+  script:
+  - wget https://github.com/SimonKagstrom/kcov/archive/master.tar.gz &&
+        tar xzf master.tar.gz &&
+        cd kcov-master &&
+        mkdir build &&
+        cd build &&
+        cmake .. &&
+        make &&
+        sudo make install &&
+        cd ../.. &&
+        rm -rf kcov-master &&
+        for file in target/debug/examplerust-*[^\.d]; do mkdir -p "target/cov/$(basename $file)"; kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done &&
+        bash <(curl -s https://codecov.io/bash) &&
+        echo "Uploaded code coverage"
