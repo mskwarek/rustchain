@@ -1,3 +1,4 @@
+
 .cargo_test_template: &cargo_test
   stage: test
   script:
