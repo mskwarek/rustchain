@@ -7,25 +7,13 @@ extern crate pretty_env_logger;
 extern crate log;
 #[macro_use]
 extern crate serde_json;
-<<<<<<< HEAD
 #[macro_use]
 extern crate serde_derive;
 extern crate serde;
-=======
->>>>>>> * porting to new hyper version in progress
 
 extern crate rustc_serialize;
 extern crate uuid;
 extern crate url;
-<<<<<<< HEAD
-=======
-
-use hyper::{Response, Request, Method, Server, Client, StatusCode, Body, header};
-use hyper::service::service_fn;
-use hyper::client::HttpConnector;
-use futures::{future, Future};
-
->>>>>>> * porting to new hyper version in progress
 
 use hyper::{Response, Request, Method, Server, Client, StatusCode, Body, header, Chunk};
 use hyper::service::service_fn;
@@ -163,7 +151,6 @@ impl Blockchain {
     }
 }
 
-<<<<<<< HEAD
 fn get_transaction(data: &str) -> Result<Transaction, serde_json::Error> {
     let p: Transaction = serde_json::from_str(data)?;
     println!("Transaction to add: {}, {}, {}", p.amount, p.recipient, p.sender);
@@ -282,70 +269,6 @@ fn parse_register(form_chunk: Result<Chunk, hyper::Error>) -> futures::future::F
         }
     }
 }
-=======
-// fn parse_form(form_chunk: Chunk) -> FutureResult<Transaction, hyper::Error> {
-//     let mut form = url::form_urlencoded::parse(form_chunk.as_ref())
-//         .into_owned()
-//         .collect::<HashMap<String, String>>();
-
-//     if let (Some(amount), Some(recipient), Some(sender)) = (form.remove("amount"), form.remove("recipient"), form.remove("sender")) {
-//         futures::future::ok(Transaction { amount: amount.parse::<u32>().unwrap(), recipient: recipient, sender: sender })
-//     } else {
-//         futures::future::err(hyper::Error::from(io::Error::new(
-//             io::ErrorKind::InvalidInput,
-//             "Missing field 'amount' or 'recipient' or 'sender'",
-//         )))
-//     }
-// }
-
-
-// fn make_error_response(error_message: &str) -> FutureResult<Item=Response<Body>, Error=hyper::Error> {
-//     let payload = json!({
-//         "error": error_message
-//     }).to_string();
-//     let response = Response::builder()
-//                         .header(header::CONTENT_TYPE, "application/json")
-//                         .body(Body::from(json))
-//                         .unwrap();
-//     futures::future::ok(response)
-// }
-
-// fn make_post_response(result: Result<Transaction, hyper::Error>, ) -> FutureResult<Item=Response<Body>, Error=hyper::Error> {
-//     match result {
-//         Ok(transaction) => {
-//             let mut guard = GLOBAL_BLOCKCHAIN.lock().unwrap();
-//             let block = guard.new_transaction(transaction);
-
-//             let payload = json!({"message" : format!("Transaction will be added to block {}", block)}).to_string();
-//             let response = Response::new(payload);
-//             debug!("{:?}", response);
-//             futures::future::ok(response)
-//         }
-//         Err(error) => make_error_response(error.description()),
-//     }
-// }
-
-// fn parse_register(form_chunk: Chunk) -> FutureResult<Vec<String>, hyper::Error> {
-//     let mut form = url::form_urlencoded::parse(form_chunk.as_ref())
-//         .into_owned()
-//         .collect::<HashMap<String, String>>();
-
-//     if let Some(nodes) = form.remove("nodes") {
-//         let res: Vec<String> = nodes
-//             .replace("[", "")
-//             .replace("]", "")
-//             .replace(" ", "")
-//             .split(",")
-//             .map(|s| s.to_string()).collect();
-//         futures::future::ok(res)
-//     } else {
-//         futures::future::err(hyper::Error::from(io::Error::new(
-//             io::ErrorKind::InvalidInput,
-//             "Missing field 'nodes' or 'recipient' or 'sender'",
-//         )))
-//     }
-// }
->>>>>>> * porting to new hyper version in progress
 
 struct Microservice
 {
@@ -359,7 +282,6 @@ lazy_static! {
 
 mod lib;
 
-<<<<<<< HEAD
 fn register_node(address: String) {
 //    println!("{}", address);
     let result = GLOBAL_NODES_SET.lock().unwrap().iter().position(|r| r.to_string() == address);
@@ -370,48 +292,6 @@ fn register_node(address: String) {
         }
     }
 }
-=======
-// fn build_ok_response(body: String) -> FutureResult<Item=Response<Body>, Error=hyper::Error> {
-    // future::ok(
-    //     Response::builder()
-    //         .status(StatusCode::OK)
-    //         .body(Body::from(body))
-    //         .unwrap()
-    // )
-//     future::ok(Response::new(body))
-// }
-
-// fn register_node(address: String) {
-//     println!("{}", address);
-//     let result = GLOBAL_NODES_SET.lock().unwrap().iter().position(|r| r.to_string() == address);
-//     match  result {
-//         Some(_) => {}
-//         _ => {
-//             GLOBAL_NODES_SET.lock().unwrap().push(address);
-//         }
-//     }
-
-// }
-
-// fn make_register_response(result: Result<Vec<String>, hyper::Error>, ) -> FutureResult<Item=Response<Body>, Error=hyper::Error> {
-//     match result {
-//         Ok(rsp) => {
-//             println!("{:?}", rsp);
-//             for item in rsp {
-//                 register_node(item);
-//             }
-//             let all = GLOBAL_NODES_SET.lock().unwrap().to_vec();
-
-//             let nodes_str = format!("{:?}", all);
-//             let payload = json!({"message" : format!("Nodes will be registered"), "nodes" : nodes_str}).to_string();
-        
-//             debug!("{:?}", payload);
-//             futures::future::ok(response)
-//         }
-//         Err(error) => make_error_response(error.description()),
-//     }
-// }
->>>>>>> * porting to new hyper version in progress
 
 fn request_chain_from(neighbour: String) -> Vec<Block> {
     println!("{}", neighbour);
@@ -476,10 +356,6 @@ fn make_resolve_response() -> futures::future::FutureResult<hyper::Response<Body
     future::ok(response)
 }
 
-<<<<<<< HEAD
-=======
-
->>>>>>> * porting to new hyper version in progress
 fn response(req: Request<Body>, client: &Client<HttpConnector>)
     -> Box<Future<Item=Response<Body>, Error=hyper::Error> + Send>{
     debug!("{:?}", req);
@@ -489,7 +365,6 @@ fn response(req: Request<Body>, client: &Client<HttpConnector>)
         (&Method::GET, "/mine") => {
             let mut guard = GLOBAL_BLOCKCHAIN.lock().unwrap();
             let block = guard.mine_new_block();
-<<<<<<< HEAD
             let res = return_json(&block);
 
             Box::new(future::ok(res))
@@ -514,56 +389,6 @@ fn response(req: Request<Body>, client: &Client<HttpConnector>)
         (&Method::GET, "/nodes/resolve") => {
             Box::new(make_resolve_response())
         }
-=======
-            let res = match serde_json::to_string(&block) {
-                Ok(json) => {
-                    // return a json response
-                    Response::builder()
-                        .header(header::CONTENT_TYPE, "application/json")
-                        .body(Body::from(json))
-                        .unwrap()
-                }
-                // This is unnecessary here because we know
-                // this can't fail. But if we were serializing json that came from another
-                // source we could handle an error like this.
-                Err(e) => {
-                    eprintln!("serializing json: {}", e);
-
-                    Response::builder()
-                        .status(StatusCode::INTERNAL_SERVER_ERROR)
-                        .body(Body::from("Internal Server Error"))
-                        .unwrap()
-                }
-            };
-
-            Box::new(future::ok(res))
-        }
-        // (Post, "/transactions/new") => {
-        //     let future = request
-        //         .body()
-        //         .concat2()
-        //         .and_then(parse_form)
-        //         .then(make_post_response);
-        //     Box::new(future)
-        // }
-        // (Get, "/chain") => {
-        //     let chain = serde_json::to_string(&GLOBAL_BLOCKCHAIN.lock().unwrap().chain).expect("Couldn't serialize blockchain");
-        //     Box::new(build_ok_response(chain))
-        // }
-        // (Post, "/nodes/register") => {
-        //     let future = request
-        //         .body()
-        //         .concat2()
-        //         .and_then(parse_register)
-        //         .then(make_register_response);
-        //     Box::new(future)
-        // }
-        // (Get, "/nodes/resolve") => {
-        //     let validated_chain = chain_consensus();
-        //     let resp_body = make_resolve_response(validated_chain);
-        //     Box::new(build_ok_response(resp_body))
-        // }
->>>>>>> * porting to new hyper version in progress
         _ => {
             let body = Body::from(NOTFOUND);
             Box::new(future::ok(Response::builder()
