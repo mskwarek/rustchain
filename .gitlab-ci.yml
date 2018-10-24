@@ -3,8 +3,8 @@
 # https://hub.docker.com/r/library/rust/tags/
 image: "rust:latest"
 
-before_install:
-  - apt-get update
+before_install: 
+  apt-get update
 addons:
   apt:
     packages:
