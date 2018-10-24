@@ -4,9 +4,14 @@
   script:
     - cargo test --verbose --jobs 1 --all
 
+.cargo_test_template: &cargo_coverage
+  stage: test
+  script:
+    - RUSTFLAGS='-C link-dead-code' cargo test --verbose --jobs 1 --all
+
 test:stable:cargo:
   image: registry.gitlab.com/starshell/docker/rust-codecov:stable
-  <<: *cargo_test
+  <<: *cargo_coverage
   after_script:
     - |
       for file in target/debug/rustchain-*[^\.d]; do mkdir -p "target/cov/$(basename $file)"; kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done &&
