@@ -94,10 +94,10 @@ impl Blockchain {
     pub fn new_transaction(&mut self, transaction: Transaction) -> u32 {
         self.current_transactions.push(transaction);
         let num = match self.chain.last()
-            {
-                Some(_) => self.chain.last().unwrap().index,
-                None => 0
-            };
+        {
+            Some(_) => self.chain.last().unwrap().index,
+            None => 0
+        };
         num + 1
     }
 
@@ -107,8 +107,7 @@ impl Blockchain {
             previous_hash: previous_hash,
             proof: proof,
             timestamp: time::now().tm_nsec as u32,
-            transactions: self.current_transactions.to_vec()
-        };
+            transactions: self.current_transactions.to_vec()};
 
         self.chain.push(block.clone());
         self.current_transactions = Vec::new();
@@ -352,7 +351,6 @@ fn chain_consensus() -> Vec<Block> {
             tmp_longest_chain = new_chain;
         }
     }
-
     tmp_longest_chain
 }
 
@@ -368,7 +366,7 @@ fn make_resolve_response() -> futures::future::FutureResult<hyper::Response<Body
     future::ok(response)
 }
 
-fn response(req: Request<Body>, client: &Client<HttpConnector>)
+fn response(req: Request<Body>, _client: &Client<HttpConnector>)
     -> Box<Future<Item=Response<Body>, Error=hyper::Error> + Send>{
     debug!("{:?}", req);
     static NOTFOUND: &[u8] = b"Not Found";
