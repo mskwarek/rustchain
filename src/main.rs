@@ -270,11 +270,6 @@ fn parse_register(form_chunk: Result<Chunk, hyper::Error>) -> futures::future::F
     }
 }
 
-struct Microservice
-{
-
-}
-
 lazy_static! {
     static ref GLOBAL_BLOCKCHAIN: Mutex<Blockchain> = Mutex::new(Blockchain::new());
     static ref GLOBAL_NODES_SET: Mutex<Vec<String>> = Mutex::new(Vec::new());
@@ -480,7 +475,8 @@ mod tests {
             transactions: Vec::new()
         };
         let hash = Blockchain::calculate_hash_from_block(&block);
-        let expected_hash = "36303566323332313133666639643032316337376264613461303932333666313564366136366363363062613137636335393231643564393336636139653133";
+        let expected_hash = "36303566323332313133666639643032316337376264613461303932333666313\
+            564366136366363363062613137636335393231643564393336636139653133";
         assert_eq!(hash, expected_hash);
     }
 
