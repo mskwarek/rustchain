@@ -488,8 +488,7 @@ mod tests {
             previous_hash: "1".to_string(),
             proof: 100,
             timestamp: 333037375,
-            transactions: Vec::new()
-        };
+            transactions: Vec::new()};
         let hash = Blockchain::calculate_hash_from_block(&block);
         let expected_hash = "36303566323332313133666639643032316337376264613461303932333666313\
             564366136366363363062613137636335393231643564393336636139653133";
@@ -516,20 +515,9 @@ mod tests {
         assert_eq!(index2, 3);
     }
 
-    // #[test]
-    // fn () {
-    //     let mut chain = Blockchain::new();
-    //     let transaction = Transaction { 
-        // amount: 5, recipient: "me".to_string(), 
-        // sender: "you".to_string() 
-        // };
-    //     let index = chain.new_transaction(transaction);
-    //     assert_eq!(1, chain.current_transactions.len());
-    //     chain.mine_new_block();
-    //     let index2 = chain.new_transaction(
-        // Transaction { amount: 10, recipient: "you".to_string(), sender: "me".to_string() });
-    //     assert_eq!(1, chain.current_transactions.len());
-
-
-    // }
+    #[test]
+    fn typed_example_test() {
+        let result = typed_example("{\"nodes\" : [\"127.0.0.1:1234\"]}");
+        assert!(result.is_ok());
+    }
 }
