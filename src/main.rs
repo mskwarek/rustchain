@@ -85,7 +85,11 @@ impl Blockchain {
             transactions: Vec::new()
         });
         let my_uuid = Uuid::new_v4();
-        Blockchain { chain: vec, current_transactions: Vec::new(), node_identifier: my_uuid.to_string().replace("-", "") }
+        Blockchain { 
+            chain: vec, 
+            current_transactions: Vec::new(), 
+            node_identifier: my_uuid.to_string().replace("-", "") 
+        }
     }
     pub fn new_transaction(&mut self, transaction: Transaction) -> u32 {
         self.current_transactions.push(transaction);
@@ -139,7 +143,9 @@ impl Blockchain {
     }
 
     fn reward_for_proof(&mut self) {
-        self.current_transactions.push(Transaction { amount: 1, recipient: self.node_identifier.clone(), sender: "0".to_string() });
+        self.current_transactions.push(
+            Transaction { amount: 1, recipient: self.node_identifier.clone(), sender: "0".to_string() }
+        );
     }
 
     pub fn mine_new_block(&mut self) -> Block {
@@ -157,7 +163,8 @@ fn get_transaction(data: &str) -> Result<Transaction, serde_json::Error> {
     Ok(p)
 }
 
-fn parse_form(form_chunk: Result<Chunk, hyper::Error>) -> futures::future::FutureResult<hyper::Response<Body>, hyper::Error>  {
+fn parse_form(form_chunk: Result<Chunk, hyper::Error>) 
+        -> futures::future::FutureResult<hyper::Response<Body>, hyper::Error>  {
     match form_chunk {
         Ok(body) => {
             let mut acc = Vec::new();
@@ -168,7 +175,11 @@ fn parse_form(form_chunk: Result<Chunk, hyper::Error>) -> futures::future::Futur
                 Ok(transaction) => {
                     let mut guard = GLOBAL_BLOCKCHAIN.lock().unwrap();
                     let block = guard.new_transaction(transaction);
-                    let payload = json!({"message" : format!("Transaction will be added to block {}", block)}).to_string();
+                    let payload = json!(
+                        {
+                            "message" : format!("Transaction will be added to block {}", block)
+                        }
+                    ).to_string();
                     let response = Response::builder()
                         .header(header::CONTENT_TYPE, "application/json")
                         .body(Body::from(payload))
@@ -235,7 +246,8 @@ fn typed_example(data: &str) -> Result<NodeList, serde_json::Error> {
 }
 
 
-fn parse_register(form_chunk: Result<Chunk, hyper::Error>) -> futures::future::FutureResult<hyper::Response<Body>, hyper::Error> {
+fn parse_register(form_chunk: Result<Chunk, hyper::Error>) 
+        -> futures::future::FutureResult<hyper::Response<Body>, hyper::Error> {
     match form_chunk {
         Ok(body) => {
             let mut acc = Vec::new();
@@ -251,7 +263,12 @@ fn parse_register(form_chunk: Result<Chunk, hyper::Error>) -> futures::future::F
 
                     let all = GLOBAL_NODES_SET.lock().unwrap().to_vec();
                     let nodes_str = format!("{:?}", all);
-                    let payload = json!({"message" : format!("Nodes will be registered"), "nodes" : nodes_str}).to_string();
+                    let payload = json!(
+                        {
+                            "message" : format!("Nodes will be registered"), 
+                            "nodes" : nodes_str
+                        }
+                    ).to_string();
                     debug!("{:?}", payload);
                     future::ok(Response::builder()
                         .header(header::CONTENT_TYPE, "application/json")
@@ -453,7 +470,8 @@ mod tests {
         let transaction = Transaction { amount: 5, recipient: "me".to_string(), sender: "you".to_string() };
         let index = chain.new_transaction(transaction);
         assert_eq!(1, chain.current_transactions.len());
-        let index2 = chain.new_transaction(Transaction { amount: 10, recipient: "you".to_string(), sender: "me".to_string() });
+        let index2 = chain.new_transaction(
+            Transaction { amount: 10, recipient: "you".to_string(), sender: "me".to_string() });
         assert_eq!(index, 2);
         assert_eq!(2, chain.current_transactions.len());
         assert_eq!(index2, 2);
@@ -493,7 +511,8 @@ mod tests {
         let index = chain.new_transaction(transaction);
         assert_eq!(1, chain.current_transactions.len());
         chain.mine_new_block();
-        let index2 = chain.new_transaction(Transaction { amount: 10, recipient: "you".to_string(), sender: "me".to_string() });
+        let index2 = chain.new_transaction(
+            Transaction { amount: 10, recipient: "you".to_string(), sender: "me".to_string() });
         assert_eq!(1, chain.current_transactions.len());
         assert_eq!(index, 2);
         assert_eq!(index2, 3);
@@ -502,11 +521,15 @@ mod tests {
     // #[test]
     // fn () {
     //     let mut chain = Blockchain::new();
-    //     let transaction = Transaction { amount: 5, recipient: "me".to_string(), sender: "you".to_string() };
+    //     let transaction = Transaction { 
+        // amount: 5, recipient: "me".to_string(), 
+        // sender: "you".to_string() 
+        // };
     //     let index = chain.new_transaction(transaction);
     //     assert_eq!(1, chain.current_transactions.len());
     //     chain.mine_new_block();
-    //     let index2 = chain.new_transaction(Transaction { amount: 10, recipient: "you".to_string(), sender: "me".to_string() });
+    //     let index2 = chain.new_transaction(
+        // Transaction { amount: 10, recipient: "you".to_string(), sender: "me".to_string() });
     //     assert_eq!(1, chain.current_transactions.len());
 
 
