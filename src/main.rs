@@ -76,14 +76,12 @@ impl Blockchain {
             previous_hash: "1".to_string(),
             proof: 100,
             timestamp: 333037375,
-            transactions: Vec::new()
-        });
+            transactions: Vec::new()});
         let my_uuid = Uuid::new_v4();
         Blockchain { 
             chain: vec, 
             current_transactions: Vec::new(), 
-            node_identifier: my_uuid.to_string().replace("-", "") 
-        }
+            node_identifier: my_uuid.to_string().replace("-", "")}
     }
     pub fn new_transaction(&mut self, transaction: Transaction) -> u32 {
         self.current_transactions.push(transaction);
@@ -152,7 +150,7 @@ impl Blockchain {
 
 fn get_transaction(data: &str) -> Result<Transaction, serde_json::Error> {
     let p: Transaction = serde_json::from_str(data)?;
-    println!("Transaction to add: {}, {}, {}", p.amount, p.recipient, p.sender);
+    // println!("Transaction to add: {}, {}, {}", p.amount, p.recipient, p.sender);
     Ok(p)
 }
 
@@ -234,7 +232,6 @@ struct NodeList {
 
 fn typed_example(data: &str) -> Result<NodeList, serde_json::Error> {
     let p: NodeList = serde_json::from_str(data)?;
-    println!("Please register: {:?}", p.nodes);
     Ok(p)
 }
 
@@ -535,5 +532,11 @@ mod tests {
     fn get_transaction_is_failed_when_json_is_not_well_formed_test() {
         let result = get_transaction("{\"amount\" : \"1\", \"recipient\" : \"12\"}");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn one_application_header_is_added_when_making_error_response_test() {
+        let response = make_error_response("unittest error check");
+        assert_eq!(response.headers().iter().count(), 1);
     }
 }
