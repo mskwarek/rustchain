@@ -41,12 +41,6 @@ use crypto::sha2::Sha256;
 use uuid::Uuid;
 use std::str;
 
-#[derive(Debug)]
-#[derive(Serialize, Deserialize)]
-pub struct NewMessage {
-    pub username: String,
-    pub message: String,
-}
 
 #[derive(PartialEq, PartialOrd)]
 #[derive(Clone)]
