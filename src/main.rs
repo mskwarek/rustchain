@@ -530,4 +530,16 @@ mod tests {
         register_node("127.0.0.1:1234".to_string());
         assert_eq!(GLOBAL_NODES_SET.lock().unwrap().iter().count(), 1);
     }
+
+    #[test]
+    fn get_transaction_success_test() {
+        let result = get_transaction("{\"amount\" : 1, \"recipient\" : \"12\", \"sender\" : \"21\"}");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn get_transaction_is_failed_when_json_is_not_well_formed_test() {
+        let result = get_transaction("{\"amount\" : \"1\", \"recipient\" : \"12\"}");
+        assert!(result.is_err());
+    }
 }
