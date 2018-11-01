@@ -516,8 +516,14 @@ mod tests {
     }
 
     #[test]
-    fn typed_example_test() {
+    fn typed_example_success_test() {
         let result = typed_example("{\"nodes\" : [\"127.0.0.1:1234\"]}");
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn typed_example_failure_cause_json_is_not_well_formed_test() {
+        let result = typed_example("{\"nodes\" : \"127.0.0.1:1234\"]}");
+        assert!(result.is_err());
     }
 }
