@@ -195,9 +195,7 @@ fn parse_form(form_chunk: Result<Chunk, hyper::Error>)
 
 
 fn make_error_response(error_message: &str) -> Response<Body> {
-    let payload = json!({
-        "error": error_message
-    }).to_string();
+    let payload = json!({ "error": error_message }).to_string();
     Response::builder()
         .header(header::CONTENT_TYPE, "application/json")
         .body(Body::from(payload))
