@@ -291,8 +291,6 @@ lazy_static! {
     static ref GLOBAL_NODES_SET: Mutex<Vec<String>> = Mutex::new(Vec::new());
 }
 
-mod lib;
-
 fn register_node(address: String) {
 //    println!("{}", address);
     let result = GLOBAL_NODES_SET.lock().unwrap().iter().position(|r| r.to_string() == address);
@@ -525,5 +523,11 @@ mod tests {
     fn typed_example_failure_cause_json_is_not_well_formed_test() {
         let result = typed_example("{\"nodes\" : \"127.0.0.1:1234\"]}");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn node_is_registered_test() {
+        register_node("127.0.0.1:1234".to_string());
+        assert_eq!(GLOBAL_NODES_SET.lock().unwrap().iter().count(), 1);
     }
 }
