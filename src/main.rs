@@ -537,4 +537,16 @@ mod tests {
         let response = make_error_response("unittest error check");
         assert_eq!(response.headers().iter().count(), 1);
     }
+
+    #[test]
+    fn return_json_msg_without_error_when_can_serialize_data_test() {
+        let response = return_json(
+            &vec![Block {
+                    index: 1, 
+                    previous_hash: "123".to_string(), 
+                    proof: 1, 
+                    timestamp: 1, 
+                    transactions: Vec::new()}]);
+        assert_eq!(response.headers().iter().count(), 1);
+    }
 }
