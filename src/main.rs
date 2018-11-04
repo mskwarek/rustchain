@@ -223,8 +223,13 @@ fn return_json<T>(data: &T) -> hyper::Response<Body>
     }
 }
 
-fn typed_example(data: &str) -> Result<Vec<String>, serde_json::Error> {
-    let p: Vec<String> = serde_json::from_str(data)?;
+#[derive(Serialize, Deserialize)]
+struct NodeList {
+    nodes: Vec<String>,
+}
+
+fn typed_example(data: &str) -> Result<NodeList, serde_json::Error> {
+    let p: NodeList = serde_json::from_str(data)?;
     Ok(p)
 }
 
@@ -239,8 +244,8 @@ fn parse_register(form_chunk: Result<Chunk, hyper::Error>)
             println!("{}", stringify);
 
             match typed_example(&stringify.to_string()) {
-                Ok(json_list) => {
-                    for item in json_list {
+                Ok(json) => {
+                    for item in json.nodes {
                         register_node(item);
                     }
 
