@@ -22,14 +22,14 @@ use futures::{future, Future};
 use serde::ser;
 use futures::Stream;
 use std::io::Write;
-
+use std::env;
 
 extern crate time;
 extern crate crypto;
 
 
 
-#[macro_use] 
+#[macro_use]
 extern crate lazy_static;
 
 use std::sync::Mutex;
@@ -78,9 +78,9 @@ impl Blockchain {
             timestamp: 333037375,
             transactions: Vec::new()});
         let my_uuid = Uuid::new_v4();
-        Blockchain { 
-            chain: vec, 
-            current_transactions: Vec::new(), 
+        Blockchain {
+            chain: vec,
+            current_transactions: Vec::new(),
             node_identifier: my_uuid.to_string().replace("-", "")}
     }
     pub fn new_transaction(&mut self, transaction: Transaction) -> u32 {
@@ -154,7 +154,7 @@ fn get_transaction(data: &str) -> Result<Transaction, serde_json::Error> {
     Ok(p)
 }
 
-fn parse_form(form_chunk: Result<Chunk, hyper::Error>) 
+fn parse_form(form_chunk: Result<Chunk, hyper::Error>)
         -> futures::future::FutureResult<hyper::Response<Body>, hyper::Error>  {
     match form_chunk {
         Ok(body) => {
@@ -234,7 +234,7 @@ fn typed_example(data: &str) -> Result<NodeList, serde_json::Error> {
 }
 
 
-fn parse_register(form_chunk: Result<Chunk, hyper::Error>) 
+fn parse_register(form_chunk: Result<Chunk, hyper::Error>)
         -> futures::future::FutureResult<hyper::Response<Body>, hyper::Error> {
     match form_chunk {
         Ok(body) => {
@@ -253,7 +253,7 @@ fn parse_register(form_chunk: Result<Chunk, hyper::Error>)
                     let nodes_str = format!("{:?}", all);
                     let payload = json!(
                         {
-                            "message" : format!("Nodes will be registered"), 
+                            "message" : format!("Nodes will be registered"),
                             "nodes" : nodes_str
                         }
                     ).to_string();
@@ -267,7 +267,7 @@ fn parse_register(form_chunk: Result<Chunk, hyper::Error>)
                     future::ok(make_error_response("Wrong nodes list"))
                 }
             }
-            
+
         }
         Err(_) => {
             future::ok(make_error_response("No nodes in request"))
@@ -397,11 +397,12 @@ fn response(req: Request<Body>, _client: &Client<HttpConnector>)
 
 }
 
-
 fn main() {
     pretty_env_logger::init();
+    let args: Vec<String> = env::args().collect();
 
-    let addr = "127.0.0.1:1337".parse().unwrap();
+    let port: u16 = args[1].parse().unwrap();
+    let addr = ([127, 0, 0, 1], port).into();
 
     hyper::rt::run(future::lazy(move || {
         // Share a `Client` with all `Service`s
@@ -542,10 +543,10 @@ mod tests {
     fn return_json_msg_without_error_when_can_serialize_data_test() {
         let response = return_json(
             &vec![Block {
-                    index: 1, 
-                    previous_hash: "123".to_string(), 
-                    proof: 1, 
-                    timestamp: 1, 
+                    index: 1,
+                    previous_hash: "123".to_string(),
+                    proof: 1,
+                    timestamp: 1,
                     transactions: Vec::new()}]);
         assert_eq!(response.headers().iter().count(), 1);
     }
